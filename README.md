@@ -219,32 +219,6 @@ curl -X POST http://localhost:5000/api/chat \
   -H "Content-Type: application/json" \
   -d "{\"query\": \"Bagaimana margin skripsi yang benar?\"}"
 ```
-
----
-
-## Struktur Folder
-
-```
-akademikai/
-├── backend-node/
-│   ├── prisma/
-│   │   └── schema.prisma      # Database schema
-│   ├── .env
-│   ├── index.js               # Express server (port 5000)
-│   └── package.json
-├── backend-python/
-│   ├── app/
-│   │   └── main.py            # FastAPI RAG service (port 8000)
-│   ├── documents/             # PDF sumber (3 file)
-│   ├── chroma_store/          # Vector database
-│   ├── .env
-│   └── requirements.txt
-├── frontend/
-│   ├── src/
-│   │   └── App.jsx
-│   └── package.json
-└── README.md
-```
 ---
 
 ## Guardrails Keamanan
