@@ -259,33 +259,6 @@ akademikai/
 
 ---
 
-## 🛡️ Guardrails Keamanan
-
-| ID | Guardrail | Implementasi |
-|----|-----------|--------------|
-| **G1** | Strict Grounding | Jawaban hanya dari chunk ≥ threshold 0.35; HALT jika tidak ada |
-| **G2** | Mandatory Citation | Setiap klaim wajib punya `source_file` + `page_number` |
-| **G3** | Educational Mode | Deteksi pertanyaan ujian → beri hints, bukan jawaban |
-| **G4** | Privacy Guard | Dokumen sensitif tidak diproses ke embedding |
-
-### Citation Validator (Refusal Detection)
-
-Sistem otomatis mendeteksi jika LLM menolak menjawab:
-
-```python
-refusal_markers = [
-    "tidak tersedia",
-    "tidak disebutkan",
-    "tidak ditemukan",
-    "maaf, informasi",
-    "tidak dapat menemukan",
-]
-```
-
-Jika terdeteksi → `sources: []` dan `hallucination_risk_flag: true`
-
----
-
 ## 📊 Evaluasi & Pengujian
 
 Evaluasi dilakukan dengan menguji 8 skenario pertanyaan yang merepresentasikan penggunaan nyata AkademikAI. Semua pengujian dilakukan secara end-to-end melalui UI React yang terhubung ke Node.js backend dan Python RAG service.
