@@ -223,34 +223,28 @@ curl -X POST http://localhost:5000/api/chat \
 ---
 
 ## Struktur Folder
+
+```
 akademikai/
 ├── backend-node/
 │   ├── prisma/
-│   │   └── schema.prisma
+│   │   └── schema.prisma      # Database schema
 │   ├── .env
-│   ├── seed.js              # Membuat user dummy untuk testing
-│   ├── index.js             # Express server, port 5000
+│   ├── index.js               # Express server (port 5000)
 │   └── package.json
 ├── backend-python/
 │   ├── app/
-│   │   ├── init.py
-│   │   └── main.py          # FastAPI RAG service, port 8000
-│   ├── documents/           # 3 file PDF sumber
-│   ├── chroma_store/        # Vector database (persist)
-│   ├── reset_collection.py  # Reset koleksi ChromaDB
-│   ├── reindex_all.py       # Index ulang seluruh dokumen
-│   ├── test_search.py       # Script pengujian similarity search
+│   │   └── main.py            # FastAPI RAG service (port 8000)
+│   ├── documents/             # PDF sumber (3 file)
+│   ├── chroma_store/          # Vector database
 │   ├── .env
 │   └── requirements.txt
 ├── frontend/
 │   ├── src/
-│   │   ├── App.jsx
-│   │   ├── App.css
-│   │   ├── api.js
-│   │   └── index.css
+│   │   └── App.jsx
 │   └── package.json
 └── README.md
-
+```
 ---
 
 ## Guardrails Keamanan
