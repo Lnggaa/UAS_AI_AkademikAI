@@ -1,0 +1,45 @@
+:root {
+  --color-ink: #1c2333;
+  --color-paper: #f2f3ef;
+  --color-surface: #ffffff;
+  --color-border: #dde0d9;
+  --color-muted: #5b6156;
+  --color-verified: #2f6b5e;
+  --color-risk: #b9793a;
+  --color-user: #2b3a67;
+
+  --font-display: "Source Serif 4", Georgia, serif;
+  --font-body: "Inter", -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--color-paper);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font-family: inherit;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 4px;
+}
