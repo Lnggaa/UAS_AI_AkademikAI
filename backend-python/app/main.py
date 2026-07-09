@@ -12,7 +12,7 @@ import pdfplumber
 from groq import Groq
 from dotenv import load_dotenv
 import logging
-import re
+import json
 
 # Load environment variables
 load_dotenv()
@@ -22,7 +22,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Initialize FastAPI
-app = FastAPI(title="AkademikAI RAG Service", version="1.2.0")
+app = FastAPI(title="AkademikAI RAG Service", version="1.3.1")
 
 # CORS
 app.add_middleware(
@@ -39,8 +39,6 @@ CHROMA_PERSIST_DIR = os.getenv("CHROMA_PERSIST_DIR", "./chroma_store")
 CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", 600))
 CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", 80))
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "paraphrase-multilingual-MiniLM-L12-v2")
-
-# Threshold tunggal untuk seluruh sistem
 SIMILARITY_THRESHOLD = float(os.getenv("SIMILARITY_THRESHOLD", 0.35))
 
 if not GROQ_API_KEY:
@@ -53,7 +51,6 @@ chroma_client = chromadb.PersistentClient(
 )
 
 collection_name = "akademikai_docs"
-
 collection = chroma_client.get_or_create_collection(
     name=collection_name,
     metadata={"hnsw:space": "cosine"}
@@ -168,10 +165,7 @@ def process_document(file_path: str, source_file: str):
         logger.error(f"Error adding to ChromaDB: {e}")
 
 def search_documents(query: str, top_k: int = 5, threshold: float = SIMILARITY_THRESHOLD) -> List[Dict]:
-    """
-    Cari chunk yang relevan secara semantik dan LANGSUNG memfilter
-    berdasarkan threshold di sini.
-    """
+    """Cari chunk yang relevan secara semantik dan filter berdasarkan threshold."""
     query_embedding = embedder.encode([query], convert_to_numpy=True).tolist()
 
     candidate_count = max(top_k * 3, 15)
@@ -201,11 +195,48 @@ def search_documents(query: str, top_k: int = 5, threshold: float = SIMILARITY_T
     chunks.sort(key=lambda c: c["similarity_score"], reverse=True)
     return chunks[:top_k]
 
+def validate_grounding_with_llm(query: str, chunks: List[Dict], answer: str) -> bool:
+    """
+    LLM-based validator - hanya dipanggil jika tidak ada sources.
+    """
+    context_snippet = "\n\n".join([c["text"][:300] for c in chunks]) if chunks else "Tidak ada konteks."
+
+    validation_prompt = f"""Anda adalah validator otomatis. Tugas Anda HANYA menjawab dengan JSON, tanpa kalimat tambahan.
+
+PERTANYAAN:
+{query}
+
+KONTEKS DOKUMEN:
+{context_snippet}
+
+JAWABAN AI:
+{answer}
+
+Apakah JAWABAN AI pada dasarnya menyatakan bahwa informasi yang diminta TIDAK TERSEDIA?
+Jawab HANYA dengan JSON:
+{{"is_refusal": true}}  ← jika jawaban intinya menolak/mengatakan tidak ada info
+{{"is_refusal": false}} ← jika jawaban memberikan informasi substantif"""
+
+    try:
+        validation = groq_client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[{"role": "user", "content": validation_prompt}],
+            temperature=0,
+            max_tokens=20,
+        )
+        raw_output = validation.choices[0].message.content.strip().lower()
+        logger.info(f"Hasil LLM validator: {raw_output}")
+        
+        # Parse JSON
+        if "true" in raw_output:
+            return False  # grounded = False
+        return True  # grounded = True
+    except Exception as e:
+        logger.error(f"LLM validator error: {e}")
+        return True  # Jika error, anggap grounded
+
 def generate_answer(query: str, chunks: List[Dict]) -> Dict:
-    """
-    Susun jawaban lewat Groq, HANYA berdasarkan chunk yang sudah lolos
-    filter similarity di search_documents().
-    """
+    """Generate answer using Groq API with grounded context"""
     if not chunks:
         return {
             "answer": (
@@ -232,7 +263,8 @@ def generate_answer(query: str, chunks: List[Dict]) -> Dict:
     system_prompt = """Anda adalah AkademikAI, asisten akademik yang berbasis dokumen resmi.
 Anda HANYA boleh menjawab berdasarkan konteks dokumen yang diberikan.
 JANGAN menggunakan pengetahuan umum di luar dokumen.
-Jika informasi tidak ada dalam konteks, katakan bahwa informasi tidak tersedia.
+Jika informasi tidak ada dalam konteks, katakan bahwa informasi tidak tersedia
+di KALIMAT PERTAMA jawaban Anda.
 Jawab dengan bahasa Indonesia yang jelas dan sopan.
 Sertakan sumber referensi (nama file dan halaman) untuk setiap klaim."""
 
@@ -257,69 +289,38 @@ Jawab pertanyaan berdasarkan dokumen di atas. Berikan jawaban yang akurat dan le
         answer = completion.choices[0].message.content
 
         # ============================================================
-        # 🔥 CITATION_VALIDATOR() - SESUAI DESAIN SESI 14 🔥
+        # 🔥 HYBRID CITATION VALIDATOR - OPSI 2 🔥
         # ============================================================
-        # Deteksi apakah LLM sendiri mengakui bahwa informasi tidak tersedia.
-        # Kalau iya, tandai sebagai hallucination_risk_flag = True
-        # dan kosongkan sources.
-        refusal_markers = [
-            "tidak tersedia",
-            "tidak disebutkan",
-            "tidak ditemukan",
-            "tidak ada informasi",
-            "maaf, informasi",
-            "tidak dapat menemukan",
-            "tidak menyebutkan",
-            "informasi tentang.*tidak tersedia",
-            "tidak terdapat dalam dokumen",
-            "di luar cakupan dokumen",
-        ]
-
-        answer_lower = answer.lower()
-        is_actually_refusal = False
-        for marker in refusal_markers:
-            if re.search(marker, answer_lower):
-                is_actually_refusal = True
-                logger.info(f"⚠️  Refusal detected: '{marker}' found in answer")
-                break
-
-        # Validasi tambahan: cek apakah answer menyebutkan "tidak ada" atau "maaf"
-        # dengan konteks penolakan.
-        if is_actually_refusal:
+        # Step 1: Jika ada sources → anggap grounded langsung!
+        # Step 2: Jika tidak ada sources → baru panggil LLM validator
+        # ============================================================
+        if sources:
+            # Ada sumber → jawaban valid, langsung grounded
+            logger.info("✅ Sources ditemukan, jawaban dianggap grounded")
             return {
                 "answer": answer,
-                "sources": [],  # Kosongkan sources - tidak ada grounding!
-                "hallucination_risk_flag": True  # Tandai sebagai risiko!
+                "sources": sources,
+                "hallucination_risk_flag": False
             }
-
-        # ============================================================
-        # VALIDASI LANJUTAN: cek setiap klaim di jawaban punya sumber
-        # ============================================================
-        # Simple citation validator: cek apakah ada klaim tanpa sumber
-        # (deteksi kalimat yang menyatakan fakta tanpa menyebut file/halaman)
-        sentences = re.split(r'[.!?]+', answer)
-        suspicious_claims = []
-        for sent in sentences:
-            sent = sent.strip()
-            if len(sent) < 20:  # Skip kalimat pendek
-                continue
-            # Jika kalimat mengandung kata kunci fakta tapi tidak ada sumber
-            fact_keywords = ['adalah', 'merupakan', 'berdasarkan', 'menurut', 'terdiri dari', 'yaitu']
-            has_fact = any(kw in sent.lower() for kw in fact_keywords)
-            has_source = any(ref in sent for ref in ['Sumber:', 'panduan_', 'rubrik_', 'silabus_', '.pdf', 'Hal.'])
+        else:
+            # Tidak ada sumber → cek apakah ini penolakan sungguhan
+            logger.info("⚠️  Tidak ada sources, jalankan LLM validator...")
+            is_grounded = validate_grounding_with_llm(query, chunks, answer)
             
-            if has_fact and not has_source and len(sent) > 30:
-                suspicious_claims.append(sent[:50] + "...")
-
-        if suspicious_claims and len(suspicious_claims) > 2:
-            logger.warning(f"⚠️  Potensi klaim tanpa sumber: {len(suspicious_claims)} ditemukan")
-            # Tidak langsung flag, tapi log untuk monitoring
-
-        return {
-            "answer": answer,
-            "sources": sources,
-            "hallucination_risk_flag": False
-        }
+            if not is_grounded:
+                logger.info("❌ LLM validator: ini adalah penolakan")
+                return {
+                    "answer": answer,
+                    "sources": [],
+                    "hallucination_risk_flag": True
+                }
+            else:
+                logger.info("✅ LLM validator: jawaban substantif meski tanpa sources")
+                return {
+                    "answer": answer,
+                    "sources": [],
+                    "hallucination_risk_flag": False
+                }
 
     except Exception as e:
         logger.error(f"Groq API error: {e}")
@@ -339,7 +340,8 @@ async def health_check():
         "collection": collection_name,
         "total_chunks": collection.count(),
         "embedding_model": EMBEDDING_MODEL,
-        "similarity_threshold": SIMILARITY_THRESHOLD
+        "similarity_threshold": SIMILARITY_THRESHOLD,
+        "version": "1.3.1"
     }
 
 @app.post("/index")
@@ -392,7 +394,7 @@ async def search(request: QueryRequest):
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
-    """Chat dengan AkademikAI — full RAG pipeline (retrieve -> validate -> generate)."""
+    """Chat dengan AkademikAI — full RAG pipeline."""
     session_id = request.session_id or str(uuid.uuid4())
 
     chunks = search_documents(request.query, top_k=5, threshold=SIMILARITY_THRESHOLD)
