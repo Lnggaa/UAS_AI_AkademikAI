@@ -1,566 +1,291 @@
-\# 🤖 AkademikAI
-
-
+# AkademikAI
 
 > "Dari referensi berantakan menjadi karya siap dikumpulkan."
 
+AkademikAI adalah asisten penulisan akademik berbasis RAG (Retrieval-Augmented Generation) yang dirancang untuk membantu mahasiswa S1 semester 5-7 menyusun skripsi, laporan akademik, dan proposal penelitian. Sistem ini menjawab pertanyaan seputar format penulisan, struktur bab, standar sitasi (APA/IEEE), dan rubrik penilaian tugas akhir hanya berdasarkan dokumen resmi program studi, bukan pengetahuan umum internet, sehingga risiko halusinasi informasi dapat ditekan seminimal mungkin.
 
+---
 
-\*\*AkademikAI\*\* adalah asisten penulisan akademik berbasis RAG (Retrieval-Augmented Generation) yang dirancang khusus untuk membantu mahasiswa S1 semester 5-7 menyusun skripsi, laporan akademik, dan proposal penelitian. Sistem ini menjawab pertanyaan seputar format penulisan, struktur bab, standar sitasi (APA/IEEE), dan rubrik penilaian tugas akhir \*\*HANYA\*\* berdasarkan dokumen resmi program studi — bukan internet umum — sehingga \*\*bebas halusinasi!\*\*
+## Daftar Isi
 
+- [Fitur Utama](#fitur-utama)
+- [Tech Stack](#tech-stack)
+- [Arsitektur Sistem](#arsitektur-sistem)
+- [Prasyarat](#prasyarat)
+- [Instalasi dan Menjalankan](#instalasi-dan-menjalankan)
+- [Testing](#testing)
+- [Struktur Folder](#struktur-folder)
+- [Guardrails Keamanan](#guardrails-keamanan)
+- [Evaluasi dan Pengujian](#evaluasi-dan-pengujian)
+- [Keterbatasan yang Diketahui](#keterbatasan-yang-diketahui)
+- [Kontributor](#kontributor)
 
+---
 
-\---
-
-
-
-\## 📋 Daftar Isi
-
-
-
-\- \[Fitur Utama](#fitur-utama)
-
-\- \[Tech Stack](#tech-stack)
-
-\- \[Arsitektur Sistem](#arsitektur-sistem)
-
-\- \[Prasyarat](#prasyarat)
-
-\- \[Instalasi \& Menjalankan](#instalasi--menjalankan)
-
-\- \[Testing](#testing)
-
-\- \[Struktur Folder](#struktur-folder)
-
-\- \[Guardrails Keamanan](#guardrails-keamanan)
-
-\- \[Screenshot](#screenshot)
-
-\- \[Evaluasi](#evaluasi)
-
-\- \[Kontributor](#kontributor)
-
-\- \[Lisensi](#lisensi)
-
-
-
-\---
-
-
-
-\## ✨ Fitur Utama
-
-
+## Fitur Utama
 
 | Fitur | Deskripsi |
+|---|---|
+| Document-Grounded RAG | Jawaban hanya berdasarkan dokumen resmi (panduan skripsi, rubrik evaluasi, silabus) |
+| Strict Grounding | Guardrail yang menolak menjawab pertanyaan di luar cakupan dokumen |
+| Citation Validator | Mendeteksi kalau jawaban LLM sendiri menyatakan informasi tidak tersedia, lalu mengosongkan sumber dan menandai risiko halusinasi |
+| Source Attribution | Setiap jawaban yang grounded disertai sumber (nama file dan halaman) |
+| Audit Log | Setiap interaksi tercatat di database: query, similarity score, status halusinasi |
+| Multi-Session | Riwayat percakapan tersimpan dan dapat dibuka ulang per pengguna |
+| Antarmuka Chat | Tampilan chat dengan chip sumber yang dapat diperluas untuk melihat skor similarity |
 
-|-------|-----------|
+---
 
-| \*\*📄 Document-Grounded RAG\*\* | Jawaban hanya berdasarkan dokumen resmi (PDF skripsi, rubrik, silabus) |
+## Tech Stack
 
-| \*\*🛡️ Anti-Hallusinasi\*\* | Guardrail Strict Grounding — menolak pertanyaan di luar dokumen |
-
-| \*\*🔗 Source Attribution\*\* | Setiap jawaban disertai sumber (file + halaman) |
-
-| \*\*📊 Audit Log\*\* | Semua interaksi tercatat di database (query, similarity score, hallucination risk) |
-
-| \*\*💬 Multi-Session\*\* | Riwayat chat tersimpan per user |
-
-| \*\*⚡ Real-time\*\* | Proses RAG end-to-end < 5 detik |
-
-| \*\*🎨 UI Bersih\*\* | Tampilan chat dengan badge sumber dan risk indicator |
-
-
-
-\---
-
-
-
-\## 🛠️ Tech Stack
-
-
-
-\### Frontend
-
-| Teknologi | Versi | Fungsi |
-
-|-----------|-------|--------|
-
-| \*\*React\*\* | 18.x | UI Library |
-
-| \*\*Vite\*\* | 5.x | Build tool \& dev server |
-
-| \*\*Axios\*\* | 1.x | HTTP client untuk API calls |
-
-| \*\*React Markdown\*\* | 9.x | Render markdown di chat |
-
-
-
-\### Backend (Node.js - Orchestrator)
-
-| Teknologi | Versi | Fungsi |
-
-|-----------|-------|--------|
-
-| \*\*Node.js\*\* | 20.x | Runtime environment |
-
-| \*\*Express\*\* | 4.x | Web framework |
-
-| \*\*Prisma\*\* | 5.22.0 | ORM untuk database |
-
-| \*\*MySQL\*\* | 8.x | Relational database |
-
-| \*\*Axios\*\* | 1.x | HTTP client ke Python service |
-
-| \*\*CORS\*\* | 2.x | Cross-origin resource sharing |
-
-
-
-\### RAG Service (Python - Core Intelligence)
-
-| Teknologi | Versi | Fungsi |
-
-|-----------|-------|--------|
-
-| \*\*Python\*\* | 3.11 | Runtime environment |
-
-| \*\*FastAPI\*\* | 0.115.6 | Web framework |
-
-| \*\*ChromaDB\*\* | 0.5.23 | Vector database |
-
-| \*\*Sentence-Transformers\*\* | 3.3.1 | Embedding model (all-MiniLM-L6-v2) |
-
-| \*\*Groq\*\* | 0.13.0 | LLM Inference (llama-3.1-8b-instant) |
-
-| \*\*pdfplumber\*\* | 0.11.4 | PDF text extraction |
-
-| \*\*LangChain\*\* | 0.3.x | Text splitting \& chunking |
-
-| \*\*Uvicorn\*\* | 0.34.x | ASGI server |
-
-
-
-\### Database
+### Frontend
 
 | Teknologi | Fungsi |
+|---|---|
+| React (Vite) | UI library dan build tool |
+| Fetch API (native) | Komunikasi HTTP ke backend-node |
 
-|-----------|--------|
-
-| \*\*MySQL 8.x\*\* | Menyimpan: User, ChatSession, ChatMessage, AuditLog |
-
-| \*\*ChromaDB (Vector)\*\* | Menyimpan: 91 chunks dari 3 dokumen PDF |
-
-
-
-\### Dev Tools
+### Backend Node.js (Orchestrator)
 
 | Teknologi | Fungsi |
+|---|---|
+| Express | Web framework |
+| Prisma ORM | Akses database MySQL |
+| MySQL | Menyimpan User, ChatSession, ChatMessage, AuditLog |
+| Axios | HTTP client untuk memanggil Python RAG service |
+| CORS | Mengizinkan request dari frontend |
 
-|-----------|--------|
+### Backend Python (RAG Core)
 
-| \*\*npm\*\* | Package manager (Node.js) |
+| Teknologi | Fungsi |
+|---|---|
+| FastAPI | Web framework untuk RAG service |
+| ChromaDB | Vector database (metric: cosine similarity) |
+| Sentence-Transformers | Model embedding: `paraphrase-multilingual-MiniLM-L12-v2` |
+| Groq API | LLM inference (`llama-3.1-8b-instant`) |
+| pdfplumber | Ekstraksi teks PDF per halaman |
+| langchain-text-splitters | Chunking teks (`RecursiveCharacterTextSplitter`) |
+| Uvicorn | ASGI server |
 
-| \*\*pip\*\* | Package manager (Python) |
+Versi persis setiap dependency dapat dicek langsung di `frontend/package.json`, `backend-node/package.json`, dan `backend-python/requirements.txt`.
 
-| \*\*Prisma Studio\*\* | Database GUI |
+### Database
 
-| \*\*Postman / curl\*\* | API Testing |
+| Komponen | Isi |
+|---|---|
+| MySQL | User, ChatSession, ChatMessage, AuditLog |
+| ChromaDB | 91 chunk dari 3 dokumen PDF (panduan skripsi, rubrik evaluasi, silabus) |
 
+---
 
+## Arsitektur Sistem
 
-\---
-
-
-
-\## 🏗️ Arsitektur Sistem
-
-
-
+```mermaid
 flowchart TD
+    A["User<br/>React Frontend<br/>localhost:5173"] -->|POST /api/chat| B["Node.js Backend<br/>Port 5000"]
 
-&#x20;   A\["👤 User<br/>React Frontend<br/>localhost:5173"] -->|POST /api/chat| B\["🟢 Node.js Backend<br/>Port 5000"]
+    B --> C["Express Server"]
+    C --> D["Prisma ORM"]
+    C --> E["Audit Logger"]
 
-&#x20;   
+    D -->|Read/Write| F[("MySQL<br/>User, Session,<br/>Message, AuditLog")]
+    E -->|Write| F
 
-&#x20;   B --> C\["Express Server"]
+    C -->|POST /chat| G["Python RAG Service<br/>Port 8000"]
 
-&#x20;   C --> D\["Prisma ORM"]
+    G --> H["FastAPI Server"]
+    H --> I["ChromaDB Vector Store"]
+    H --> J["Embedding Model<br/>paraphrase-multilingual-MiniLM-L12-v2"]
+    H --> K["Groq LLM<br/>llama-3.1-8b-instant"]
+    H --> L["Citation Validator"]
 
-&#x20;   C --> E\["Audit Logger"]
+    I --> M[("ChromaDB<br/>91 Chunks<br/>3 PDF")]
 
-&#x20;   
+    G -->|Return Answer| C
+    C -->|Response| A
 
-&#x20;   D -->|Read/Write| F\[("🗄️ MySQL<br/>User, Session,<br/>Message, AuditLog")]
+    style A fill:#e3f2fd,stroke:#1565c0,stroke-width:2px,color:#000000
+    style B fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px,color:#000000
+    style C fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px,color:#000000
+    style D fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px,color:#000000
+    style E fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px,color:#000000
+    style F fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px,color:#000000
+    style G fill:#fff3e0,stroke:#e65100,stroke-width:2px,color:#000000
+    style H fill:#fff3e0,stroke:#e65100,stroke-width:2px,color:#000000
+    style I fill:#fff3e0,stroke:#e65100,stroke-width:2px,color:#000000
+    style J fill:#fff3e0,stroke:#e65100,stroke-width:2px,color:#000000
+    style K fill:#fff3e0,stroke:#e65100,stroke-width:2px,color:#000000
+    style L fill:#fff3e0,stroke:#e65100,stroke-width:2px,color:#000000
+    style M fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px,color:#000000
+```
 
-&#x20;   E -->|Write| F
+### Alur Data
 
-&#x20;   
+1. User mengirim pertanyaan melalui UI React.
+2. Node.js menerima request, mencari atau membuat ChatSession, menyimpan pesan user ke MySQL.
+3. Node.js memanggil Python RAG service melalui HTTP (`POST /chat`).
+4. Python melakukan:
+   - Retrieve: mencari chunk relevan di ChromaDB berdasarkan cosine similarity.
+   - Filter: hanya chunk dengan similarity di atas threshold (0.35) yang dipakai.
+   - Generate: chunk yang lolos dikirim ke Groq API untuk menyusun jawaban.
+   - Validate: Citation Validator memeriksa apakah jawaban LLM sendiri menyatakan informasi tidak ditemukan; jika iya, sumber dikosongkan dan `hallucination_risk_flag` diset `true`.
+5. Python mengembalikan jawaban, daftar sumber, dan status risiko halusinasi.
+6. Node.js menyimpan pesan assistant beserta metadata sumber, dan mencatat audit log (similarity score, tool yang dipanggil, status risiko) ke MySQL.
+7. UI menampilkan jawaban, disertai chip sumber (jika grounded) atau banner peringatan (jika ditolak).
 
-&#x20;   C -->|POST /chat| G\["🐍 Python RAG Service<br/>Port 8000"]
+---
 
-&#x20;   
+## Prasyarat
 
-&#x20;   G --> H\["FastAPI Server"]
+- Node.js versi 20 atau lebih baru
+- Python versi 3.11 atau lebih baru
+- MySQL versi 8 atau lebih baru
 
-&#x20;   H --> I\["ChromaDB Vector Store"]
+---
 
-&#x20;   H --> J\["Embedding Model<br/>all-MiniLM-L6-v2"]
+## Instalasi dan Menjalankan
 
-&#x20;   H --> K\["Groq LLM<br/>llama-3.1-8b-instant"]
+Jalankan ketiga komponen ini secara bersamaan, masing-masing di terminal terpisah.
 
-&#x20;   H --> L\["Citation Validator"]
+### 1. Backend Node.js
 
-&#x20;   
-
-&#x20;   I --> M\[("📊 ChromaDB<br/>91 Chunks<br/>3 PDF")]
-
-&#x20;   
-
-&#x20;   G -->|Return Answer| C
-
-&#x20;   C -->|Response| A
-
-&#x20;   
-
-&#x20;   style A fill:#e3f2fd,stroke:#1565c0,stroke-width:2px,color:#000000
-
-&#x20;   style B fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px,color:#000000
-
-&#x20;   style C fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px,color:#000000
-
-&#x20;   style D fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px,color:#000000
-
-&#x20;   style E fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px,color:#000000
-
-&#x20;   style F fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px,color:#000000
-
-&#x20;   style G fill:#fff3e0,stroke:#e65100,stroke-width:2px,color:#000000
-
-&#x20;   style H fill:#fff3e0,stroke:#e65100,stroke-width:2px,color:#000000
-
-&#x20;   style I fill:#fff3e0,stroke:#e65100,stroke-width:2px,color:#000000
-
-&#x20;   style J fill:#fff3e0,stroke:#e65100,stroke-width:2px,color:#000000
-
-&#x20;   style K fill:#fff3e0,stroke:#e65100,stroke-width:2px,color:#000000
-
-&#x20;   style L fill:#fff3e0,stroke:#e65100,stroke-width:2px,color:#000000
-
-&#x20;   style M fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px,color:#000000
-
-Alur Data Detail
-
-User mengirim pertanyaan melalui UI React
-
-
-
-Node.js menerima request, menyimpan pesan user ke MySQL
-
-
-
-Node.js memanggil Python RAG service via HTTP
-
-
-
-Python melakukan:
-
-
-
-Retrieve: Cari chunk relevan di ChromaDB (cosine similarity ≥ 0.35)
-
-
-
-Ground: Filter chunk yang lolos threshold
-
-
-
-Generate: Kirim chunk ke Groq API untuk generate jawaban
-
-
-
-Validate: Deteksi penolakan (refusal detection)
-
-
-
-Python mengembalikan jawaban + sumber
-
-
-
-Node.js menyimpan pesan assistant + audit log ke MySQL
-
-
-
-UI menampilkan jawaban dengan badge sumber
-
-
-
-📋 Prasyarat
-
-Sebelum menjalankan, pastikan sudah terinstall:
-
-
-
-Node.js ≥ 20.x
-
-
-
-Python ≥ 3.11
-
-
-
-MySQL ≥ 8.x
-
-
-
-Git (opsional)
-
-
-
-🚀 Instalasi \& Menjalankan
-
-1\. Clone Repository (atau download)
-
-bash
-
-git clone https://github.com/username/akademikai.git
-
-cd akademikai
-
-2\. Setup Backend Node.js
-
-bash
-
+```bash
 cd backend-node
-
 npm install
-
-
-
-\# Buat file .env
-
-cp .env.example .env
-
-\# Edit .env: DATABASE\_URL, GROQ\_API\_KEY, PYTHON\_SERVICE\_URL
-
-
-
-\# Setup Prisma
-
 npx prisma generate
-
 npx prisma db push
-
-
-
-\# Jalankan
-
+node seed.js
 npm run dev
+```
 
-3\. Setup Python RAG Service
+Isi `backend-node/.env`:
+```env
+DATABASE_URL="mysql://root:password_kamu@localhost:3306/akademikai_db"
+GROQ_API_KEY="tidak dipakai langsung di sini, hanya cadangan"
+PYTHON_SERVICE_URL="http://localhost:8000"
+PORT=5000
+```
 
-bash
+### 2. Backend Python (RAG Service)
 
+```bash
 cd backend-python
-
 python -m venv venv
-
-
-
-\# Aktifkan virtual environment
-
-\# Windows:
-
-venv\\Scripts\\activate
-
-\# Mac/Linux:
-
-source venv/bin/activate
-
-
-
+venv\Scripts\activate      # Windows
+# source venv/bin/activate # Mac/Linux
 pip install -r requirements.txt
+python reset_collection.py
+python reindex_all.py
+uvicorn app.main:app --reload --port 8000
+```
 
+Isi `backend-python/.env`:
+```env
+GROQ_API_KEY="isi_dengan_api_key_groq"
+CHROMA_PERSIST_DIR="./chroma_store"
+CHUNK_SIZE=600
+CHUNK_OVERLAP=80
+EMBEDDING_MODEL="paraphrase-multilingual-MiniLM-L12-v2"
+SIMILARITY_THRESHOLD=0.35
+```
 
+### 3. Frontend React
 
-\# Buat file .env
-
-cp .env.example .env
-
-\# Edit .env: GROQ\_API\_KEY
-
-
-
-\# Index dokumen (pastikan PDF di folder documents/)
-
-python index\_documents.py
-
-
-
-\# Jalankan service
-
-python -m app.main
-
-4\. Setup Frontend React
-
-bash
-
+```bash
 cd frontend
-
 npm install
-
-
-
-\# Jalankan
-
 npm run dev
+```
 
-5\. Buka Aplikasi
+### Akses Aplikasi
 
-Frontend: http://localhost:5173
+- Frontend: `http://localhost:5173`
+- Backend Node: `http://localhost:5000/health`
+- Python RAG Service: `http://localhost:8000/health`
 
+---
 
+## Testing
 
-Backend: http://localhost:5000/health
+```bash
+curl http://localhost:5000/health
+curl http://localhost:8000/health
 
+curl -X POST http://localhost:8000/chat \
+  -H "Content-Type: application/json" \
+  -d "{\"query\": \"Bagaimana margin skripsi yang benar?\"}"
 
+curl -X POST http://localhost:5000/api/chat \
+  -H "Content-Type: application/json" \
+  -d "{\"query\": \"Bagaimana margin skripsi yang benar?\"}"
+```
+---
 
-Python Service: http://localhost:8000/health
+## Guardrails Keamanan
 
+| ID | Guardrail | Mekanisme |
+|---|---|---|
+| G1 | Strict Grounding | Jawaban hanya disusun dari chunk dengan cosine similarity di atas 0.35. Jika tidak ada chunk yang lolos, sistem menolak menjawab. |
+| G2 | Mandatory Citation | Setiap jawaban yang grounded menyertakan `source_file` dan `page_number` untuk setiap sumber yang dipakai. |
+| G3 | Citation Validator | Jika teks jawaban LLM sendiri mengandung frasa penolakan ("tidak tersedia", "tidak ditemukan", dan sejenisnya), sistem mengosongkan sumber dan menandai `hallucination_risk_flag = true`, meski secara similarity chunk sempat lolos threshold. |
+| G4 | Privacy Guard (rencana) | Dokumen yang mengandung data sensitif tidak diproses ke embedding. Belum diimplementasikan penuh di iterasi saat ini. |
 
+---
 
+## Evaluasi dan Pengujian
 
+Evaluasi dilakukan secara manual melalui pengujian skenario nyata end-to-end (UI React → Node.js → Python → ChromaDB/Groq → MySQL), bukan menggunakan framework RAGAS otomatis. Berikut temuan aktual dari proses pengujian.
 
-📂 Struktur Folder
+### 1. Kalibrasi model embedding dan threshold
 
-text
+Model embedding awal (`all-MiniLM-L6-v2`) tidak cukup baik membedakan pertanyaan relevan dan tidak relevan dalam Bahasa Indonesia:
 
-akademikai/
+| Query | Similarity Tertinggi |
+|---|---|
+| "Kalau Turnitin saya kena 30%..." (relevan) | 0.623 |
+| "Resep rendang daging sapi..." (tidak relevan) | 0.526 |
 
-├── backend-node/
+Selisih hanya 0.097, terlalu sempit untuk threshold yang aman. Setelah beralih ke model multibahasa (`paraphrase-multilingual-MiniLM-L12-v2`):
 
-│   ├── prisma/
+| Query | Similarity Tertinggi |
+|---|---|
+| "Kalau Turnitin saya kena 30%..." (relevan) | 0.493 |
+| "Resep rendang daging sapi..." (tidak relevan) | 0.138 |
 
-│   │   └── schema.prisma      # Database schema
+Selisih menjadi 0.355, memberi ruang aman untuk menetapkan threshold di 0.35.
 
-│   ├── .env                   # Environment variables
+### 2. Pengujian Guardrail G1 (Strict Grounding)
 
-│   ├── index.js               # Express server (port 5000)
+| Pertanyaan | Hasil |
+|---|---|
+| "Berapa margin yang benar untuk laporan skripsi?" | Dijawab lengkap, sumber `panduan_skripsi_si.pdf` Hal. 1, dengan chip sumber tambahan dari 3 dokumen |
+| "Dosen bilang pakai struktur IMRAD, urutannya apa aja?" | Dijawab lengkap, sumber `silabus_technical_writing.pdf` Hal. 6, urutan IMRAD sesuai dokumen |
+| "Bab 2 saya harus isi apa aja?" | Dijawab lengkap dengan sumber `rubrik_evaluasi_si.pdf` |
+| "Siapa presiden Indonesia saat ini?" | Ditolak, tidak ada sumber ditampilkan, `hallucination_risk_flag: true` |
+| "Siapa wakil presiden Indonesia saat ini?" | Ditolak, tidak ada sumber ditampilkan, `hallucination_risk_flag: true` |
 
-│   ├── package.json
+### 3. Temuan dan perbaikan Citation Validator
 
-│   └── tsconfig.json
+Pada iterasi awal, ditemukan celah: untuk pertanyaan "Siapa presiden Indonesia saat ini?", jawaban LLM sudah benar menyatakan informasi tidak tersedia, tetapi sistem tetap menampilkan chip sumber seolah jawaban itu grounded. Penyebabnya, satu chunk kebetulan lolos threshold similarity meski isinya tidak relevan dengan pertanyaan.
 
-├── backend-python/
+Perbaikan dilakukan dengan menambahkan pemeriksaan pada teks jawaban itu sendiri: jika jawaban mengandung frasa penolakan, sistem mengosongkan sumber dan menandai `hallucination_risk_flag = true`, terlepas dari hasil similarity chunk. Setelah perbaikan ini diterapkan, pengujian ulang pada pertanyaan yang sama dan pertanyaan sejenis ("siapa wakil presiden...") menunjukkan perilaku yang konsisten dan benar.
 
-│   ├── app/
+### 4. Pengujian sesi multi-turn
 
-│   │   ├── \_\_init\_\_.py
+Pertanyaan lanjutan dalam satu sesi ("Berapa margin..." lalu dilanjutkan "ohh oke lalu Dosen bilang pakai struktur IMRAD...") berhasil tetap tersimpan dalam `ChatSession` yang sama, dan riwayat percakapan tetap dapat dibuka kembali melalui sidebar.
 
-│   │   └── main.py            # FastAPI RAG service (port 8000)
+---
 
-│   ├── documents/             # PDF sumber (3 file)
+## Keterbatasan yang Diketahui
 
-│   ├── chroma\_store/          # Vector database
+- Non-determinisme LLM: pada pengujian dengan chunk sumber yang identik, jawaban Groq API untuk pertanyaan yang sama dapat berbeda antar percobaan, kadang menghasilkan detail yang kurang konsisten (misalnya salah menyebut satuan poin sebagai persen). Ini adalah karakteristik dasar LLM generatif, bukan kesalahan pada logika retrieval. Mitigasi yang diterapkan adalah menyediakan chip sumber yang dapat diperluas untuk melihat similarity score, agar pengguna tetap dapat memverifikasi klaim secara manual sebelum mengutipnya ke tugas akhir.
+- Evaluasi belum menggunakan metrik otomatis seperti RAGAS (Faithfulness, Answer Relevancy, Context Recall). Evaluasi saat ini bersifat pengujian skenario manual.
+- Guardrail G4 (Privacy Guard) belum diimplementasikan secara teknis, masih sebatas rancangan.
 
-│   ├── .env
+---
 
-│   └── requirements.txt
+## Kontributor
 
-├── frontend/
-
-│   ├── src/
-
-│   │   ├── components/
-
-│   │   ├── pages/
-
-│   │   └── App.jsx
-
-│   ├── package.json
-
-│   └── vite.config.js
-
-└── README.md
-
-🛡️ Guardrails Keamanan
-
-ID	Guardrail	Implementasi
-
-G1	Strict Grounding	Jawaban hanya dari chunk ≥ threshold 0.35; HALT jika tidak ada
-
-G2	Mandatory Citation	Setiap klaim wajib punya source\_file + page\_number
-
-G3	Educational Mode	Deteksi pertanyaan ujian → beri hints, bukan jawaban
-
-G4	Privacy Guard	Dokumen sensitif tidak diproses ke embedding
-
-Citation Validator (Refusal Detection)
-
-Sistem otomatis mendeteksi jika LLM menolak menjawab:
-
-
-
-python
-
-refusal\_markers = \[
-
-&#x20;   "tidak tersedia",
-
-&#x20;   "tidak disebutkan",
-
-&#x20;   "tidak ditemukan",
-
-&#x20;   "maaf, informasi",
-
-&#x20;   "tidak dapat menemukan",
-
-]
-
-Jika terdeteksi → sources: \[] dan hallucination\_risk\_flag: true
-
-
-
-📊 Evaluasi
-
-Metrik RAGAS
-
-Metrik	Target	Hasil	Status
-
-Faithfulness	≥ 0.90	✅ 1.0	Semua klaim grounded
-
-Answer Relevancy	≥ 0.85	✅ 0.92	Jawaban relevan
-
-Context Recall	≥ 0.80	✅ 0.85	Chunk relevan terambil
-
-Test Pertanyaan (8 Skenario)
-
-No	Pertanyaan	Hasil	Hallucination Risk
-
-1	Margin skripsi?	✅ Akurat	false
-
-2	Struktur Bab 2?	✅ Akurat	false
-
-3	Format APA?	✅ Akurat	false
-
-4	Penalti Turnitin 30%?	✅ Akurat	false
-
-5	Struktur IMRAD?	✅ Akurat	false
-
-6	Rubrik penilaian?	✅ Akurat	false
-
-7	Persyaratan sidang?	✅ Akurat	false
-
-8	Siapa presiden Indonesia?	✅ Ditolak	true
-
-Guardrail Anti-Hallusinasi terbukti berfungsi! 🛡️
-
-
-
-👨‍💻 Kontributor
-
-Nama	NIM	Peran
-
-Muhamad Angga Prida Saputra	24110400013	Full-stack Developer \& Designer
-
-
-
+| Nama | NIM | Peran |
+|---|---|---|
+| Muhamad Angga Prida Saputra | 24110400013 | Full-stack Developer |
